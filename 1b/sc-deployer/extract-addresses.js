@@ -34,7 +34,7 @@ try {
   }
   
   // Write the deployment JSON
-  fs.writeFileSync('./deployment.json', JSON.stringify(contracts, null, 4));
+  fs.writeFileSync('/shared/deployment.json', JSON.stringify(contracts, null, 4));
   
   console.log('✅ Contract addresses extracted to deployment.json:');
   console.log(JSON.stringify(contracts, null, 2));
