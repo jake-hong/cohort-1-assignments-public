@@ -12,7 +12,7 @@
             Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
             Access-Control-Allow-Headers *
             Access-Control-Max-Age "3600"
-            defer # turn on defer on your header directive to make sure the new header values are set after proxying
+            defer
         }
         respond "" 204
     }
@@ -29,15 +29,83 @@
 :80 {
     import cors
     
-    handle /deployment.json {
+    # Smart contracts deployment server
+    handle_path /deployment* {
         reverse_proxy sc-deployment-server:80
     }
     
-    handle /rpc* {
-        uri strip_prefix /rpc
+    # EVM Node RPC service  
+    handle_path /rpc* {
         reverse_proxy geth:8545
     }
     
+    # Graph node GraphQL playground (built-in)
+    handle_path /graph-playground* {
+        reverse_proxy graph-node:8000
+    }
+    
+    # Graph node GraphQL API
+    handle_path /graph-api* {
+        reverse_proxy graph-node:8000
+    }
+    
+    # Explorer API routes (must come before general explorer route)
+    handle /explorer/api* {
+        uri strip_prefix /explorer
+        reverse_proxy host.docker.internal:4000
+    }
+    
+    # Explorer WebSocket routes - BLOCKED
+    handle /explorer/socket* {
+        respond "" 404
+    }
+    
+    # Explorer (blockscout frontend)
+    handle /explorer* {
+        uri strip_prefix /explorer
+        reverse_proxy host.docker.internal:3000
+    }
+
+    handle /address/* {
+        reverse_proxy host.docker.internal:3000
+    }
+
+    handle /tx/* {
+        reverse_proxy host.docker.internal:3000
+    }
+
+    handle /block/* {
+        reverse_proxy host.docker.internal:3000
+    }
+
+    handle /token/* {
+        reverse_proxy host.docker.internal:3000
+    }
+    
+    # Static assets
+    handle /_next/* {
+        reverse_proxy host.docker.internal:3000
+    }
+    
+    handle /assets/* {
+        reverse_proxy host.docker.internal:3000
+    }
+    
+    handle /icons/* {
+        reverse_proxy host.docker.internal:3000
+    }
+
+    handle /static/* {
+        reverse_proxy host.docker.internal:3000
+    }
+    
+    # Explorer routes - serve at root
+    handle /explorer* {
+        uri strip_prefix /explorer
+        reverse_proxy host.docker.internal:3000
+    }
+    
+    # Default fallback to Geth for root path
     handle {
         reverse_proxy geth:8545
     }
