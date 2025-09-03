@@ -1,12 +1,38 @@
-:80 {
-    header {
-        Access-Control-Allow-Origin *
-        Access-Control-Allow-Methods "GET, OPTIONS"
-        Access-Control-Allow-Headers "Content-Type"
-        Content-Type "application/json"
+{
+    auto_https off
+}
+
+(cors) {
+    @cors_preflight* method OPTIONS
+    @cors* header Origin *
+
+    handle @cors_preflight* {
+        header {
+            Access-Control-Allow-Origin "*"
+            Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+            Access-Control-Allow-Headers *
+            Access-Control-Max-Age "3600"
+            defer
+        }
+        respond "" 204
     }
+
+    handle @cors* {
+        header {
+            Access-Control-Allow-Origin "*"
+            Access-Control-Expose-Headers *
+            defer
+        }
+    }
+}
+
+:80 {
+    import cors
     
-    root * /usr/share/caddy
-    rewrite * /deployment.json
-    file_server
+    handle {
+        root * /data
+        file_server
+        header Content-Type "application/json"
+        try_files {path} /deployment.json
+    }
 }
