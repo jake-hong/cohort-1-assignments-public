@@ -21,14 +21,26 @@ services:
     user: root # still bug, don't know how to install nodejs and npm
     volumes:
       - ./sc-deployer:/workspace
-      - ./geth-init:/shared
+      - ./geth-init:/geth-init:ro
+      - .:/shared
     working_dir: /workspace
     entrypoint: ["/bin/sh", "/workspace/entrypoint.sh"]
     depends_on:
       - geth
     networks:
       - geth-network
-  # sc-deployment-server:
+  sc-deployment-server:
+    image: caddy:2.7-alpine
+    container_name: sc-deployment-server
+    ports:
+      - "8081:80"
+    volumes:
+      - ./sc-deployment-server/Caddyfile:/etc/caddy/Caddyfile
+      - .:/data:ro
+    depends_on:
+      - sc-deployer
+    networks:
+      - geth-network
   geth:
     image: ethereum/client-go:v1.15.0
     container_name: geth
