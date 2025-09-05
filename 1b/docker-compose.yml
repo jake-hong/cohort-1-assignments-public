@@ -12,11 +12,15 @@ services:
       - geth
     networks:
       - geth-network
+      - blockscout-network
+      - graph-network
+  # ngrok:
   sc-deployer:
-    image: ghcr.io/hell-month/foundry:latest
+    # image digest varies by platform, so need to change as necessary
+    image: ghcr.io/foundry-rs/foundry:stable@sha256:67c9d2195925b4b045b3d49c3155d9097c80d9c06cc3c95adb7d7ac3c93c9a40
     platform: linux/arm64
     container_name: sc-deployer
-    user: root
+    user: root # still bug, don't know how to install nodejs and npm
     volumes:
       - ./sc-deployer:/workspace
       - ./geth-init:/geth-init:ro
@@ -58,11 +62,12 @@ services:
       --http.port 8545
       --http.corsdomain "*"
       --http.vhosts "*"
-      --http.api "eth,net,web3,personal,miner,admin,debug"
+      --http.rpcprefix "/"
+      --http.api "eth,net,web3,personal,miner,admin,debug,txpool"
       --ws
       --ws.addr 0.0.0.0
       --ws.port 8546
-      --ws.api "eth,net,web3,personal,miner,admin,debug"
+      --ws.api "eth,net,web3,personal,miner,admin,debug,txpool"
       --ws.origins "*"
       --allow-insecure-unlock
       --mine
@@ -85,16 +90,85 @@ services:
       - geth
     networks:
       - geth-network
-  # graph-ipfs:
-  # graph-postgres:
-  # graph-redis:
-  # graph-node:
+  graph-ipfs:
+    image: ipfs/kubo:v0.29.0
+    container_name: graph-ipfs
+    ports:
+      - "5001:5001"
+    volumes:
+      - graph-ipfs-data:/data/ipfs
+    environment:
+      - IPFS_PROFILE=server
+    networks:
+      - graph-network
+
+  graph-postgres:
+    image: postgres:15
+    container_name: graph-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=graph
+      - POSTGRES_PASSWORD=letmein
+      - POSTGRES_DB=graph
+      - PGDATA=/var/lib/postgresql/data/pgdata
+      - POSTGRES_INITDB_ARGS=--locale=C --encoding=UTF8
+    volumes:
+      - graph-postgres-data:/var/lib/postgresql/data
+    networks:
+      - graph-network
+
+  graph-redis:
+    image: redis:7-alpine
+    container_name: graph-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - graph-redis-data:/data
+    networks:
+      - graph-network
+
+  graph-node:
+    image: graphprotocol/graph-node:v0.36.1
+    container_name: graph-node
+    depends_on:
+      - graph-ipfs
+      - graph-postgres
+      - graph-redis
+      - geth
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+      - "8020:8020"
+      - "8030:8030"
+      - "8040:8040"
+    environment:
+      - postgres_host=graph-postgres
+      - postgres_user=graph
+      - postgres_pass=letmein
+      - postgres_db=graph
+      - ipfs=graph-ipfs:5001
+      - ethereum=mainnet:http://geth:8545
+      - GRAPH_LOG=info
+      - RUST_LOG=info
+      - GRAPH_ALLOW_NON_DETERMINISTIC_FULLTEXT_SEARCH=true
+    networks:
+      - graph-network
+      - geth-network
 
   # blockscout: should be another docker-compose.yml file from https://github.com/blockscout/blockscout/tree/master/docker-compose. Don't create a container in this file.
 
 volumes:
   geth-data:
+  graph-ipfs-data:
+  graph-postgres-data:
+  graph-redis-data:
 
 networks:
   geth-network:
+    driver: bridge
+  blockscout-network:
+    external: true
+    name: blockscout_blockscout-network
+  graph-network:
     driver: bridge
