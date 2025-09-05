@@ -1,0 +1,69 @@
+version: "3.9"
+
+services:
+  redis-db:
+    image: redis:7-alpine
+    container_name: redis-db
+    command: redis-server
+    volumes:
+      - redis-data:/data
+    networks:
+      - blockscout-network
+
+  db-init:
+    extends:
+      file: ./services/db.yml
+      service: db-init
+    networks:
+      - blockscout-network
+
+  db:
+    extends:
+      file: ./services/db.yml
+      service: db
+    networks:
+      - blockscout-network
+
+  backend:
+    extends:
+      file: ./services/backend.yml
+      service: backend
+    depends_on:
+      - db
+      - redis-db
+    environment:
+      ETHEREUM_JSONRPC_HTTP_URL: http://geth:8545/
+      ETHEREUM_JSONRPC_TRACE_URL: http://geth:8545/
+      ETHEREUM_JSONRPC_WS_URL: ws://geth:8546/
+      CHAIN_ID: "1337"
+      ETHEREUM_JSONRPC_VARIANT: "geth"
+    ports:
+      - "4000:4000"
+    networks:
+      - blockscout-network
+      - geth-network
+
+  frontend:
+    extends:
+      file: ./services/frontend.yml
+      service: frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+    networks:
+      - blockscout-network
+      - geth-network
+
+volumes:
+  redis-data:
+  blockscout-db-data:
+  blockscout-logs:
+  blockscout-dets:
+
+networks:
+  blockscout-network:
+    driver: bridge
+  geth-network:
+    external: true
+    name: 1b_geth-network

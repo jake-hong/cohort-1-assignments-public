@@ -12,6 +12,7 @@ services:
       - geth
     networks:
       - geth-network
+      - blockscout-network
   # ngrok:
   sc-deployer:
     # image digest varies by platform, so need to change as necessary
@@ -60,11 +61,12 @@ services:
       --http.port 8545
       --http.corsdomain "*"
       --http.vhosts "*"
-      --http.api "eth,net,web3,personal,miner,admin,debug"
+      --http.rpcprefix "/"
+      --http.api "eth,net,web3,personal,miner,admin,debug,txpool"
       --ws
       --ws.addr 0.0.0.0
       --ws.port 8546
-      --ws.api "eth,net,web3,personal,miner,admin,debug"
+      --ws.api "eth,net,web3,personal,miner,admin,debug,txpool"
       --ws.origins "*"
       --allow-insecure-unlock
       --mine
@@ -100,3 +102,6 @@ volumes:
 networks:
   geth-network:
     driver: bridge
+  blockscout-network:
+    external: true
+    name: blockscout_blockscout-network

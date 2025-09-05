@@ -12,7 +12,7 @@
             Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
             Access-Control-Allow-Headers *
             Access-Control-Max-Age "3600"
-            defer # turn on defer on your header directive to make sure the new header values are set after proxying
+            defer
         }
         respond "" 204
     }
@@ -29,16 +29,53 @@
 :80 {
     import cors
     
-    handle /deployment* {
-        uri strip_prefix /deployment
+    # Smart contracts deployment server
+    handle_path /deployment* {
         reverse_proxy sc-deployment-server:80
     }
     
-    handle /rpc* {
-        uri strip_prefix /rpc
+    # EVM Node RPC service  
+    handle_path /rpc* {
         reverse_proxy geth:8545
     }
     
+    # Explorer API routes (must come before general explorer route)
+    handle /explorer/api* {
+        uri strip_prefix /explorer
+        reverse_proxy host.docker.internal:4000
+    }
+    
+    # Explorer WebSocket routes
+    handle /explorer/socket* {
+        uri strip_prefix /explorer
+        reverse_proxy host.docker.internal:4000
+    }
+    
+    # Explorer (blockscout frontend)
+    handle /explorer* {
+        uri strip_prefix /explorer
+        reverse_proxy host.docker.internal:3000
+    }
+    
+    # Blockscout static assets (Next.js files, icons, etc.)
+    handle /_next* {
+        reverse_proxy host.docker.internal:3000
+    }
+    
+    handle /assets* {
+        reverse_proxy host.docker.internal:3000
+    }
+    
+    handle /icons* {
+        reverse_proxy host.docker.internal:3000
+    }
+    
+    # Blockscout WebSocket routes
+    handle /socket* {
+        reverse_proxy host.docker.internal:4000
+    }
+    
+    # Default fallback to Geth for root path
     handle {
         reverse_proxy geth:8545
     }
