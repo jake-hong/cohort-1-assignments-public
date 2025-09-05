@@ -39,6 +39,16 @@
         reverse_proxy geth:8545
     }
     
+    # Graph node GraphQL playground (built-in)
+    handle_path /graph-playground* {
+        reverse_proxy graph-node:8000
+    }
+    
+    # Graph node GraphQL API
+    handle_path /graph-api* {
+        reverse_proxy graph-node:8000
+    }
+    
     # Explorer API routes (must come before general explorer route)
     handle /explorer/api* {
         uri strip_prefix /explorer
