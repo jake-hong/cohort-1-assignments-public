@@ -17,6 +17,18 @@ contract MiniAMM is IMiniAMM, IMiniAMMEvents, MiniAMMLP {
 
     // implement constructor
     constructor(address _tokenX, address _tokenY) MiniAMMLP(_tokenX, _tokenY) {
+        require(_tokenX != address(0), "tokenX cannot be zero address");
+        require(_tokenY != address(0), "tokenY cannot be zero address");
+        require(_tokenX != _tokenY, "Tokens must be different");
+        
+        // Order tokens so that tokenX < tokenY
+        if (_tokenX < _tokenY) {
+            tokenX = _tokenX;
+            tokenY = _tokenY;
+        } else {
+            tokenX = _tokenY;
+            tokenY = _tokenX;
+        }
     }
 
     // Helper function to calculate square root
