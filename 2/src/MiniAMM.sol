@@ -20,7 +20,7 @@ contract MiniAMM is IMiniAMM, IMiniAMMEvents, MiniAMMLP {
         require(_tokenX != address(0), "tokenX cannot be zero address");
         require(_tokenY != address(0), "tokenY cannot be zero address");
         require(_tokenX != _tokenY, "Tokens must be different");
-        
+
         // Order tokens so that tokenX < tokenY
         if (_tokenX < _tokenY) {
             tokenX = _tokenX;
@@ -45,18 +45,21 @@ contract MiniAMM is IMiniAMM, IMiniAMMEvents, MiniAMMLP {
 
     // add parameters and implement function.
     // this function will determine the 'k'.
-    function _addLiquidityFirstTime(uint256 xAmountIn, uint256 yAmountIn) internal returns (uint256 lpMinted) {
+    function _addLiquidityFirstTime(
+        uint256 xAmountIn,
+        uint256 yAmountIn
+    ) internal returns (uint256 lpMinted) {
         require(xAmountIn > 0 && yAmountIn > 0, "Invalid amounts");
-        
+
         // Transfer tokens from user to contract
         IERC20(tokenX).transferFrom(msg.sender, address(this), xAmountIn);
         IERC20(tokenY).transferFrom(msg.sender, address(this), yAmountIn);
-        
+
         // Update reserves
         xReserve = xAmountIn;
         yReserve = yAmountIn;
         k = xAmountIn * yAmountIn;
-        
+
         // Mint LP tokens - sqrt(x * y)
         lpMinted = sqrt(xAmountIn * yAmountIn);
         _mintLP(msg.sender, lpMinted);
@@ -65,30 +68,35 @@ contract MiniAMM is IMiniAMM, IMiniAMMEvents, MiniAMMLP {
     // add parameters and implement function.
     // this function will increase the 'k'
     // because it is transferring liquidity from users to this contract.
-    function _addLiquidityNotFirstTime(uint256 xAmountIn) internal returns (uint256 lpMinted) {
+    function _addLiquidityNotFirstTime(
+        uint256 xAmountIn
+    ) internal returns (uint256 lpMinted) {
         require(xAmountIn > 0, "Invalid amount");
-        
+
         // Calculate required yAmount to maintain ratio
         uint256 yAmountIn = (xAmountIn * yReserve) / xReserve;
-        
+
         // Transfer tokens from user to contract
         IERC20(tokenX).transferFrom(msg.sender, address(this), xAmountIn);
         IERC20(tokenY).transferFrom(msg.sender, address(this), yAmountIn);
-        
+
         // Calculate LP tokens to mint proportionally
         lpMinted = (xAmountIn * totalSupply()) / xReserve;
-        
+
         // Update reserves
         xReserve += xAmountIn;
         yReserve += yAmountIn;
         k = xReserve * yReserve;
-        
+
         // Mint LP tokens
         _mintLP(msg.sender, lpMinted);
     }
 
     // complete the function. Should transfer LP token to the user.
-    function addLiquidity(uint256 xAmountIn, uint256 yAmountIn) external returns (uint256 lpMinted) {
+    function addLiquidity(
+        uint256 xAmountIn,
+        uint256 yAmountIn
+    ) external returns (uint256 lpMinted) {
         if (totalSupply() == 0) {
             // First time adding liquidity
             lpMinted = _addLiquidityFirstTime(xAmountIn, yAmountIn);
@@ -96,25 +104,53 @@ contract MiniAMM is IMiniAMM, IMiniAMMEvents, MiniAMMLP {
             // Not first time - need to maintain ratio
             uint256 yRequired = (xAmountIn * yReserve) / xReserve;
             require(yAmountIn >= yRequired, "Insufficient Y amount");
-            
+
             // Use exact amount required
             if (yAmountIn > yRequired) {
                 // Refund excess Y tokens
-                IERC20(tokenY).transferFrom(msg.sender, address(this), yRequired);
+                IERC20(tokenY).transferFrom(
+                    msg.sender,
+                    address(this),
+                    yRequired
+                );
                 yAmountIn = yRequired;
             }
-            
+
             lpMinted = _addLiquidityNotFirstTime(xAmountIn);
         }
-        
+
         emit AddLiquidity(xAmountIn, yAmountIn);
     }
 
     // Remove liquidity by burning LP tokens
-    function removeLiquidity(uint256 lpAmount) external returns (uint256 xAmount, uint256 yAmount) {
+    function removeLiquidity(
+        uint256 lpAmount
+    ) external returns (uint256 xAmount, uint256 yAmount) {
+        require(lpAmount > 0, "Invalid LP amount");
+        require(balanceOf(msg.sender) >= lpAmount, "Insufficient LP tokens");
+
+        uint256 totalSupplyBefore = totalSupply();
+        require(totalSupplyBefore > 0, "No liquidity");
+
+        // Calculate proportional amounts to return
+        xAmount = (lpAmount * xReserve) / totalSupplyBefore;
+        yAmount = (lpAmount * yReserve) / totalSupplyBefore;
+
+        require(xAmount > 0 && yAmount > 0, "Insufficient liquidity burned");
+
+        // Burn LP tokens first
+        _burnLP(msg.sender, lpAmount);
+
+        // Update reserves
+        xReserve -= xAmount;
+        yReserve -= yAmount;
+        k = xReserve * yReserve;
+
+        // Transfer tokens back to user
+        IERC20(tokenX).transfer(msg.sender, xAmount);
+        IERC20(tokenY).transfer(msg.sender, yAmount);
     }
 
     // complete the function
-    function swap(uint256 xAmountIn, uint256 yAmountIn) external {
-    }
+    function swap(uint256 xAmountIn, uint256 yAmountIn) external {}
 }
