@@ -46,16 +46,68 @@ contract MiniAMM is IMiniAMM, IMiniAMMEvents, MiniAMMLP {
     // add parameters and implement function.
     // this function will determine the 'k'.
     function _addLiquidityFirstTime(uint256 xAmountIn, uint256 yAmountIn) internal returns (uint256 lpMinted) {
+        require(xAmountIn > 0 && yAmountIn > 0, "Invalid amounts");
+        
+        // Transfer tokens from user to contract
+        IERC20(tokenX).transferFrom(msg.sender, address(this), xAmountIn);
+        IERC20(tokenY).transferFrom(msg.sender, address(this), yAmountIn);
+        
+        // Update reserves
+        xReserve = xAmountIn;
+        yReserve = yAmountIn;
+        k = xAmountIn * yAmountIn;
+        
+        // Mint LP tokens - sqrt(x * y)
+        lpMinted = sqrt(xAmountIn * yAmountIn);
+        _mintLP(msg.sender, lpMinted);
     }
 
     // add parameters and implement function.
     // this function will increase the 'k'
     // because it is transferring liquidity from users to this contract.
     function _addLiquidityNotFirstTime(uint256 xAmountIn) internal returns (uint256 lpMinted) {
+        require(xAmountIn > 0, "Invalid amount");
+        
+        // Calculate required yAmount to maintain ratio
+        uint256 yAmountIn = (xAmountIn * yReserve) / xReserve;
+        
+        // Transfer tokens from user to contract
+        IERC20(tokenX).transferFrom(msg.sender, address(this), xAmountIn);
+        IERC20(tokenY).transferFrom(msg.sender, address(this), yAmountIn);
+        
+        // Calculate LP tokens to mint proportionally
+        lpMinted = (xAmountIn * totalSupply()) / xReserve;
+        
+        // Update reserves
+        xReserve += xAmountIn;
+        yReserve += yAmountIn;
+        k = xReserve * yReserve;
+        
+        // Mint LP tokens
+        _mintLP(msg.sender, lpMinted);
     }
 
     // complete the function. Should transfer LP token to the user.
     function addLiquidity(uint256 xAmountIn, uint256 yAmountIn) external returns (uint256 lpMinted) {
+        if (totalSupply() == 0) {
+            // First time adding liquidity
+            lpMinted = _addLiquidityFirstTime(xAmountIn, yAmountIn);
+        } else {
+            // Not first time - need to maintain ratio
+            uint256 yRequired = (xAmountIn * yReserve) / xReserve;
+            require(yAmountIn >= yRequired, "Insufficient Y amount");
+            
+            // Use exact amount required
+            if (yAmountIn > yRequired) {
+                // Refund excess Y tokens
+                IERC20(tokenY).transferFrom(msg.sender, address(this), yRequired);
+                yAmountIn = yRequired;
+            }
+            
+            lpMinted = _addLiquidityNotFirstTime(xAmountIn);
+        }
+        
+        emit AddLiquidity(xAmountIn, yAmountIn);
     }
 
     // Remove liquidity by burning LP tokens
