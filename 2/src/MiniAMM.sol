@@ -152,5 +152,56 @@ contract MiniAMM is IMiniAMM, IMiniAMMEvents, MiniAMMLP {
     }
 
     // complete the function
-    function swap(uint256 xAmountIn, uint256 yAmountIn) external {}
+    function swap(uint256 xAmountIn, uint256 yAmountIn) external {
+        require(k > 0, "No liquidity in pool");
+        require(xAmountIn > 0 || yAmountIn > 0, "Must swap at least one token");
+        require(!(xAmountIn > 0 && yAmountIn > 0), "Can only swap one direction at a time");
+        
+        uint256 xOut = 0;
+        uint256 yOut = 0;
+        
+        if (xAmountIn > 0) {
+            // Swap X for Y with 0.3% fee
+            // Apply fee: effective input = input * 997 / 1000
+            uint256 xAmountInWithFee = xAmountIn * 997;
+            uint256 numerator = xAmountInWithFee * yReserve;
+            uint256 denominator = (xReserve * 1000) + xAmountInWithFee;
+            yOut = numerator / denominator;
+            
+            require(yOut > 0, "Insufficient output amount");
+            require(yOut < yReserve, "Insufficient liquidity");
+            require(xAmountIn < xReserve, "Insufficient liquidity");
+            
+            // Transfer tokens
+            IERC20(tokenX).transferFrom(msg.sender, address(this), xAmountIn);
+            IERC20(tokenY).transfer(msg.sender, yOut);
+            
+            // Update reserves
+            xReserve += xAmountIn;
+            yReserve -= yOut;
+        } else {
+            // Swap Y for X with 0.3% fee
+            uint256 yAmountInWithFee = yAmountIn * 997;
+            uint256 numerator = yAmountInWithFee * xReserve;
+            uint256 denominator = (yReserve * 1000) + yAmountInWithFee;
+            xOut = numerator / denominator;
+            
+            require(xOut > 0, "Insufficient output amount");
+            require(xOut < xReserve, "Insufficient liquidity");
+            require(yAmountIn < yReserve, "Insufficient liquidity");
+            
+            // Transfer tokens
+            IERC20(tokenY).transferFrom(msg.sender, address(this), yAmountIn);
+            IERC20(tokenX).transfer(msg.sender, xOut);
+            
+            // Update reserves
+            yReserve += yAmountIn;
+            xReserve -= xOut;
+        }
+        
+        // Update k (it will increase due to fees)
+        k = xReserve * yReserve;
+        
+        emit Swap(xAmountIn, yAmountIn, xOut, yOut);
+    }
 }
