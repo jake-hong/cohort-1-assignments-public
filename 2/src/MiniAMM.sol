@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.30;
 
 import {IMiniAMM, IMiniAMMEvents} from "./IMiniAMM.sol";
 import {MiniAMMLP} from "./MiniAMMLP.sol";
